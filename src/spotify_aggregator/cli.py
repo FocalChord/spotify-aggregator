@@ -66,6 +66,7 @@ class PlaylistAggregator:
 
     def aggregate(self):
         try:
+            print("Authenticating...")
             user = self.client.get_current_user()
             print(f"Authenticated as: {user['display_name']} ({user['id']})\n")
 

@@ -34,8 +34,8 @@ class SpotifyClient:
         if cache_path:
             self.cache_path = Path(cache_path)
         else:
-            cache_dir = Path.home() / ".spotify_aggregator"
-            cache_dir.mkdir(exist_ok=True)
+            cache_dir = Path(os.getenv("RUNNER_TEMP", os.getenv("TMPDIR", str(Path.home())))) / ".spotify_aggregator"
+            cache_dir.mkdir(exist_ok=True, parents=True)
             self.cache_path = cache_dir / "token_cache.json"
 
         self._init_client()
@@ -66,11 +66,12 @@ class SpotifyClient:
                 json.dump(cache_data, f)
 
             try:
-                auth_manager.get_access_token(check_cache=True)
+                auth_manager.get_access_token(check_cache=False)
             except Exception:
                 try:
                     auth_manager.refresh_access_token(self.refresh_token)
-                except Exception:
+                except Exception as e:
+                    print(f"Warning: Token refresh failed: {e}")
                     pass
 
         self.client = spotipy.Spotify(auth_manager=auth_manager)

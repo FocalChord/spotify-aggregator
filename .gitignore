@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# uv
+.uv/
+uv.lock
+
+# Token cache and secrets
+.cache/
+*.cache
+token_cache.json
+.env
+*.token
+
+# User-specific config (contains playlist names)
+config.yaml
+
+# Spec file (internal documentation)
+spec.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

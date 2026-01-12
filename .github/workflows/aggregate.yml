@@ -4,15 +4,6 @@ on:
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Run in dry-run mode (preview changes only)'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
 
 jobs:
   aggregate:
@@ -44,8 +35,4 @@ jobs:
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
-            uv run python -u -m spotify_aggregator.cli --config config.yaml --dry-run
-          else
-            uv run python -u -m spotify_aggregator.cli --config config.yaml
-          fi
+          uv run python -u -m spotify_aggregator.cli --config config.yaml

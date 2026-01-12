@@ -6,6 +6,11 @@ from spotify_aggregator.config import Config, ConfigError
 from spotify_aggregator.spotify_client import SpotifyClient
 
 
+def _print(msg: str):
+    print(msg)
+    sys.stdout.flush()
+
+
 class PlaylistAggregator:
     def __init__(self, client: SpotifyClient, config: Config, dry_run: bool = False):
         self.client = client
@@ -44,7 +49,7 @@ class PlaylistAggregator:
         print(f"Collecting tracks from {len(playlists)} source playlist(s)...")
 
         for playlist in playlists:
-            print(f"  - {playlist['name']} ({playlist['tracks']['total']} tracks)")
+            _print(f"  - {playlist['name']} ({playlist['tracks']['total']} tracks)")
             tracks = self.client.get_playlist_tracks(playlist['id'])
 
             for track_item in tracks:
@@ -66,25 +71,25 @@ class PlaylistAggregator:
 
     def aggregate(self):
         try:
-            print("Authenticating...")
+            _print("Authenticating...")
             user = self.client.get_current_user()
-            print(f"Authenticated as: {user['display_name']} ({user['id']})\n")
+            _print(f"Authenticated as: {user['display_name']} ({user['id']})\n")
 
-            print("Resolving source playlists...")
+            _print("Resolving source playlists...")
             source_playlists = self.resolve_playlist_names(self.config.source_playlists)
-            print(f"Found {len(source_playlists)} source playlist(s):")
+            _print(f"Found {len(source_playlists)} source playlist(s):")
             for pl in source_playlists:
-                print(f"  - {pl['name']}")
-            print()
+                _print(f"  - {pl['name']}")
+            _print("")
 
             all_tracks = self.collect_tracks(source_playlists)
             track_uris = self.get_track_uris(all_tracks)
 
             if not track_uris:
-                print("No tracks to aggregate.")
+                _print("No tracks to aggregate.")
                 return
 
-            print(f"\nResolving target playlist: {self.config.target_playlist}")
+            _print(f"\nResolving target playlist: {self.config.target_playlist}")
             target_playlist = self.client.find_playlist_by_name(self.config.target_playlist)
 
             if not target_playlist:
@@ -100,7 +105,7 @@ class PlaylistAggregator:
                     current_tracks = self.client.get_playlist_tracks(target_playlist['id'])
                     current_uris = set(self.get_track_uris(current_tracks))
             else:
-                print(f"  Found existing playlist: {target_playlist['name']}")
+                _print(f"  Found existing playlist: {target_playlist['name']}")
                 current_tracks = self.client.get_playlist_tracks(target_playlist['id'])
                 current_uris = set(self.get_track_uris(current_tracks))
 
@@ -109,28 +114,28 @@ class PlaylistAggregator:
             to_add = new_uris - current_uris
             to_remove = current_uris - new_uris
 
-            print(f"\nCurrent tracks in target: {len(current_uris)}")
-            print(f"Tracks to add: {len(to_add)}")
-            print(f"Tracks to remove: {len(to_remove)}")
+            _print(f"\nCurrent tracks in target: {len(current_uris)}")
+            _print(f"Tracks to add: {len(to_add)}")
+            _print(f"Tracks to remove: {len(to_remove)}")
 
             if self.dry_run:
-                print("\n[DRY RUN] Would update playlist with:")
-                print(f"  - {len(track_uris)} total tracks")
+                _print("\n[DRY RUN] Would update playlist with:")
+                _print(f"  - {len(track_uris)} total tracks")
                 if to_add:
                     print(f"  - {len(to_add)} new tracks")
                 if to_remove:
                     print(f"  - {len(to_remove)} tracks to be removed")
-                print("\nRun without --dry-run to apply changes.")
+                _print("\nRun without --dry-run to apply changes.")
             else:
-                print(f"\nUpdating playlist with {len(track_uris)} tracks...")
+                _print(f"\nUpdating playlist with {len(track_uris)} tracks...")
                 self.client.replace_playlist_tracks(target_playlist['id'], track_uris)
-                print("✓ Playlist updated successfully!")
+                _print("✓ Playlist updated successfully!")
 
         except ValueError as e:
-            print(f"Error: {e}", file=sys.stderr)
+            _print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
         except Exception as e:
-            print(f"Unexpected error: {e}", file=sys.stderr)
+            _print(f"Unexpected error: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
             sys.exit(1)

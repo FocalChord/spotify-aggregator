@@ -142,7 +142,6 @@ class PlaylistAggregator:
 
 
 def main():
-    _print("Starting spotify-aggregate...")
     parser = argparse.ArgumentParser(
         description="Aggregate multiple Spotify playlists into one master playlist"
     )
@@ -158,17 +157,11 @@ def main():
     )
 
     args = parser.parse_args()
-    _print(f"Config file: {args.config}")
-    _print(f"Dry run: {args.dry_run}")
 
     try:
-        _print("Loading config...")
         config = Config(args.config)
-        _print("Initializing Spotify client...")
         client = SpotifyClient()
-        _print("Creating aggregator...")
         aggregator = PlaylistAggregator(client, config, dry_run=args.dry_run)
-        _print("Running aggregation...")
         aggregator.aggregate()
 
     except ConfigError as e:

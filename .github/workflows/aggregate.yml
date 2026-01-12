@@ -44,7 +44,6 @@ jobs:
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
         run: |
-          echo "Starting aggregation..."
           if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
             uv run python -u -m spotify_aggregator.cli --config config.yaml --dry-run
           else

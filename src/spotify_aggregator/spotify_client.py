@@ -41,6 +41,7 @@ class SpotifyClient:
         self._init_client()
 
     def _init_client(self):
+        print("Creating OAuth manager...", flush=True)
         auth_manager = SpotifyOAuth(
             client_id=self.client_id,
             client_secret=self.client_secret,
@@ -48,8 +49,10 @@ class SpotifyClient:
             scope="playlist-modify-public playlist-modify-private playlist-read-private playlist-read-collaborative user-read-private",
             cache_path=str(self.cache_path),
         )
+        print("OAuth manager created", flush=True)
 
         if self.refresh_token:
+            print("Setting up refresh token...", flush=True)
             cache_data = {}
             if self.cache_path.exists():
                 try:
@@ -62,19 +65,23 @@ class SpotifyClient:
             cache_data['client_id'] = self.client_id
             cache_data['client_secret'] = self.client_secret
 
+            print(f"Writing token cache to {self.cache_path}...", flush=True)
             with open(self.cache_path, 'w') as f:
                 json.dump(cache_data, f)
+            print("Token cache written", flush=True)
 
+            print("Refreshing access token...", flush=True)
             try:
-                auth_manager.get_access_token(check_cache=False)
-            except Exception:
-                try:
-                    auth_manager.refresh_access_token(self.refresh_token)
-                except Exception as e:
-                    print(f"Warning: Token refresh failed: {e}")
-                    pass
+                token = auth_manager.refresh_access_token(self.refresh_token)
+                print(f"Token refreshed successfully, expires in {token.get('expires_in', 'unknown')} seconds", flush=True)
+            except Exception as e:
+                print(f"Warning: Token refresh failed: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
 
+        print("Creating Spotify client...", flush=True)
         self.client = spotipy.Spotify(auth_manager=auth_manager)
+        print("Spotify client created", flush=True)
 
     def _retry_with_backoff(self, func, max_retries: int = 3, base_delay: float = 1.0):
         for attempt in range(max_retries):

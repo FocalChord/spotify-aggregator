@@ -4,6 +4,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import List, Dict, Optional, Set, Any
 
@@ -110,6 +111,49 @@ class PlaylistAggregator:
 
         return resolved
 
+    def collect_tracks_routed(
+        self,
+        year_playlists: List[Dict[str, Any]],
+        extra_playlists: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        years = sorted(year_playlists, key=lambda p: p['name'])
+        year_keys = [int(p['name']) for p in years]
+        buckets: Dict[int, List[Dict[str, Any]]] = {y: [] for y in year_keys}
+
+        print(f"Collecting tracks from {len(years)} year playlist(s), routing "
+              f"{len(extra_playlists)} extra(s) by added year...")
+
+        year_tracks = {}
+        for playlist in years:
+            _print(f"  - {playlist['name']} ({playlist['tracks']['total']} tracks)")
+            year_tracks[int(playlist['name'])] = self.client.get_playlist_tracks(playlist['id'])
+
+        for playlist in extra_playlists:
+            _print(f"  - {playlist['name']} ({playlist['tracks']['total']} tracks)")
+            routed = Counter()
+            for item in self.client.get_playlist_tracks(playlist['id']):
+                if not (item['track'] and item['track']['uri']):
+                    continue
+                year = int(item['added_at'][:4]) if item.get('added_at') else year_keys[-1]
+                year = min(max(year, year_keys[0]), year_keys[-1])
+                while year not in buckets:
+                    year -= 1
+                buckets[year].append(item)
+                routed[year] += 1
+            _print(f"      routed to: {dict(sorted(routed.items()))}")
+
+        all_tracks = []
+        seen_uris: Set[str] = set()
+        for year in year_keys:
+            for item in year_tracks[year] + buckets[year]:
+                uri = item['track']['uri'] if item['track'] else None
+                if uri and uri not in seen_uris:
+                    all_tracks.append(item)
+                    seen_uris.add(uri)
+
+        print(f"\nTotal unique tracks: {len(all_tracks)}")
+        return all_tracks
+
     def collect_tracks(self, playlists: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         all_tracks = []
         seen_uris: Set[str] = set()
@@ -167,7 +211,12 @@ class PlaylistAggregator:
                 _print(f"  - {pl['name']}")
             _print("")
 
-            all_tracks = self.collect_tracks(source_playlists)
+            year_blocks = [p for p in source_playlists if re.fullmatch(r'\d{4}', p['name'] or '')]
+            extras = [p for p in source_playlists if p not in year_blocks]
+            if self.config.get('route_extras_by_added_year') and year_blocks and extras:
+                all_tracks = self.collect_tracks_routed(year_blocks, extras)
+            else:
+                all_tracks = self.collect_tracks(source_playlists)
             track_uris = self.get_track_uris(all_tracks)
 
             if not track_uris:

@@ -16,3 +16,8 @@ extra_playlists:
   - "5fFkqI0EomE4fNAiDkTn5S"  # True vibes
   - "5elXQYqwdY2LQyPc1oYToq"  # a
   - "4yJ0EHhLlE532tYOhYBkof"  # K B
+
+# Instead of appending extra playlists' tracks at the end of the target,
+# slot each track into the target's year section matching when it was
+# added to its extra playlist (years clamped to existing year playlists).
+route_extras_by_added_year: true

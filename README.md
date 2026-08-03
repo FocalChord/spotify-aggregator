@@ -75,23 +75,25 @@ Copy the example config and customize it:
 cp config.example.yaml config.yaml
 ```
 
-Then edit `config.yaml` with your playlist names:
+Then edit `config.yaml`:
 
 ```yaml
-target_playlist: "All Time Favorites"
-source_playlists:
-  - "2023"
-  - "2024"
-  - "2025"
+target_playlist: "0OGOhsdqasxSwiV10IvOMK"   # ID, exact name, or glob
+discover_pattern: "20[0-9][0-9]"            # auto-discover year playlists you own
+extra_playlists:
+  - "5fFkqI0EomE4fNAiDkTn5S"                # extra non-year playlists (IDs preferred)
 ```
 
-Or use glob patterns:
+Playlists matching `discover_pattern` are found automatically each run — a new
+"2027" playlist gets picked up with no config change. `extra_playlists` (and the
+legacy `source_playlists`) accept playlist IDs, `spotify:playlist:` URIs,
+open.spotify.com URLs, exact names, or glob patterns.
 
-```yaml
-target_playlist: "All Time Favorites"
-source_playlists:
-  - "202*"  # Matches 2020, 2021, 2022, etc.
-```
+Prefer IDs where possible: Spotify intermittently returns an empty playlist
+*listing* to datacenter IPs (like GitHub Actions runners), which breaks
+name/glob resolution there. Auto-discovery handles this by committing its last
+successful result to `.playlist_cache.json` and falling back to it whenever the
+listing comes back empty.
 
 ## Usage
 

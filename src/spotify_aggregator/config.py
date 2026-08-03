@@ -58,29 +58,41 @@ class Config:
         if 'target_playlist' not in self.data:
             raise ConfigError("Config missing required field: target_playlist")
 
-        if 'source_playlists' not in self.data:
-            raise ConfigError("Config missing required field: source_playlists")
-
         if not isinstance(self.data['target_playlist'], str):
             raise ConfigError("target_playlist must be a string")
 
-        if not isinstance(self.data['source_playlists'], list):
-            raise ConfigError("source_playlists must be a list")
+        if self.discover_pattern is not None and not isinstance(self.discover_pattern, str):
+            raise ConfigError("discover_pattern must be a string")
 
-        if len(self.data['source_playlists']) == 0:
-            raise ConfigError("source_playlists cannot be empty")
+        for field in ('source_playlists', 'extra_playlists'):
+            value = self.data.get(field, [])
+            if not isinstance(value, list):
+                raise ConfigError(f"{field} must be a list")
+            for i, item in enumerate(value):
+                if not isinstance(item, str):
+                    raise ConfigError(f"{field}[{i}] must be a string")
 
-        for i, item in enumerate(self.data['source_playlists']):
-            if not isinstance(item, str):
-                raise ConfigError(f"source_playlists[{i}] must be a string")
+        if not self.discover_pattern and not self.source_playlists and not self.extra_playlists:
+            raise ConfigError(
+                "Config must define at least one of: discover_pattern, "
+                "source_playlists, extra_playlists"
+            )
 
     @property
     def target_playlist(self) -> str:
         return self.data['target_playlist']
 
     @property
+    def discover_pattern(self) -> Any:
+        return self.data.get('discover_pattern')
+
+    @property
     def source_playlists(self) -> List[str]:
-        return self.data['source_playlists']
+        return self.data.get('source_playlists', [])
+
+    @property
+    def extra_playlists(self) -> List[str]:
+        return self.data.get('extra_playlists', [])
 
     def get(self, key: str, default: Any = None) -> Any:
         return self.data.get(key, default)

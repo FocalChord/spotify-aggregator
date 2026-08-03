@@ -1,7 +1,10 @@
 import argparse
 import fnmatch
+import json
+import os
 import re
 import sys
+from pathlib import Path
 from typing import List, Dict, Optional, Set, Any
 
 from spotify_aggregator.config import Config, ConfigError
@@ -28,18 +31,55 @@ class PlaylistAggregator:
         self.client = client
         self.config = config
         self.dry_run = dry_run
+        self._listing = None
+
+    def _get_listing(self) -> List[Dict[str, Any]]:
+        if self._listing is None:
+            try:
+                self._listing = self.client.get_user_playlists()
+            except Exception as e:
+                _print(f"Warning: could not fetch playlist listing: {e}")
+                self._listing = []
+            _print(f"Fetched {len(self._listing)} playlists")
+        return self._listing
+
+    def discover_playlists(self, pattern: str, owner_id: str) -> List[Dict[str, Any]]:
+        cache_path = Path(os.getenv("PLAYLIST_CACHE_FILE", ".playlist_cache.json"))
+        listing = self._get_listing()
+
+        if listing:
+            by_name: Dict[str, Dict[str, Any]] = {}
+            for p in listing:
+                if p['owner']['id'] != owner_id or not fnmatch.fnmatch(p['name'], pattern):
+                    continue
+                if p['name'] in by_name:
+                    _print(f"  Warning: multiple playlists named '{p['name']}'; "
+                           f"using the first one listed")
+                else:
+                    by_name[p['name']] = p
+            discovered = sorted(by_name.values(), key=lambda p: p['name'])
+            try:
+                cache_path.write_text(json.dumps(
+                    [{'id': p['id'], 'name': p['name']} for p in discovered],
+                    indent=2) + "\n")
+            except IOError as e:
+                _print(f"  Warning: could not write discovery cache: {e}")
+            return discovered
+
+        if cache_path.exists():
+            cached = json.loads(cache_path.read_text())
+            _print(f"  Listing unavailable; falling back to {len(cached)} "
+                   f"cached playlists from {cache_path}")
+            return [self.client.get_playlist(entry['id']) for entry in cached]
+
+        raise ValueError(
+            f"Playlist listing unavailable and no discovery cache ({cache_path}) "
+            "exists. Run once from a network where the listing works to seed it."
+        )
 
     def resolve_playlist_names(self, patterns: List[str]) -> List[Dict[str, Any]]:
         resolved = []
         seen_ids = set()
-        all_playlists = None
-
-        def listing():
-            nonlocal all_playlists
-            if all_playlists is None:
-                all_playlists = self.client.get_user_playlists()
-                _print(f"Fetched {len(all_playlists)} playlists")
-            return all_playlists
 
         for pattern in patterns:
             pid = _playlist_id(pattern)
@@ -49,7 +89,7 @@ class PlaylistAggregator:
                     resolved.append(playlist)
                     seen_ids.add(playlist['id'])
             elif '*' in pattern or '?' in pattern or '[' in pattern:
-                matches = [p for p in listing() if fnmatch.fnmatch(p['name'], pattern)]
+                matches = [p for p in self._get_listing() if fnmatch.fnmatch(p['name'], pattern)]
                 if not matches:
                     raise ValueError(f"No playlists found matching pattern: {pattern}")
                 matches.sort(key=lambda p: p['name'])
@@ -58,9 +98,12 @@ class PlaylistAggregator:
                         resolved.append(match)
                         seen_ids.add(match['id'])
             else:
-                playlist = next((p for p in listing() if p['name'] == pattern), None)
+                playlist = next((p for p in self._get_listing() if p['name'] == pattern), None)
                 if not playlist:
-                    raise ValueError(f"Playlist not found: {pattern}")
+                    raise ValueError(
+                        f"Playlist not found: {pattern} (if the playlist exists, the "
+                        "listing endpoint may be unavailable — use its ID instead)"
+                    )
                 if playlist['id'] not in seen_ids:
                     resolved.append(playlist)
                     seen_ids.add(playlist['id'])
@@ -101,7 +144,24 @@ class PlaylistAggregator:
             _print(f"Authenticated as: {user['display_name']} ({user['id']})\n")
 
             _print("Resolving source playlists...")
-            source_playlists = self.resolve_playlist_names(self.config.source_playlists)
+            source_playlists = []
+            seen_ids: Set[str] = set()
+
+            if self.config.discover_pattern:
+                discovered = self.discover_playlists(self.config.discover_pattern, user['id'])
+                _print(f"  Discovered {len(discovered)} playlist(s) matching "
+                       f"'{self.config.discover_pattern}'")
+                for playlist in discovered:
+                    if playlist['id'] not in seen_ids:
+                        source_playlists.append(playlist)
+                        seen_ids.add(playlist['id'])
+
+            explicit = self.config.source_playlists + self.config.extra_playlists
+            for playlist in self.resolve_playlist_names(explicit):
+                if playlist['id'] not in seen_ids:
+                    source_playlists.append(playlist)
+                    seen_ids.add(playlist['id'])
+
             _print(f"Found {len(source_playlists)} source playlist(s):")
             for pl in source_playlists:
                 _print(f"  - {pl['name']}")

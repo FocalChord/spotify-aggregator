@@ -56,7 +56,7 @@ jobs:
         run: |
           uv run python -u -m spotify_aggregator.cli --config config.yaml
 
-      - name: Persist rotated refresh token
+      - name: Persist rotated token and discovery cache
         if: always()
         env:
           TOKEN_ENC_KEY: ${{ secrets.TOKEN_ENC_KEY }}
@@ -65,14 +65,20 @@ jobs:
             openssl enc -aes-256-cbc -pbkdf2 -salt \
               -in "$RUNNER_TEMP/rotated_refresh_token" \
               -out .spotify_refresh_token.enc -pass env:TOKEN_ENC_KEY
+            git add .spotify_refresh_token.enc
+            echo "Rotated refresh token staged."
+          fi
+          if [ -n "$(git status --porcelain .playlist_cache.json)" ]; then
+            git add .playlist_cache.json
+            echo "Updated discovery cache staged."
+          fi
+          if ! git diff --cached --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add .spotify_refresh_token.enc
-            git commit -m "Persist rotated Spotify refresh token"
+            git commit -m "Persist aggregator state (token/discovery cache)"
             git push
-            echo "Rotated refresh token persisted."
           else
-            echo "No token rotation this run."
+            echo "No state changes to persist."
           fi
 
       - name: Keepalive (prevent 60-day inactivity auto-disable)

@@ -47,6 +47,7 @@ class SpotifyClient:
             redirect_uri=self.redirect_uri,
             scope="playlist-modify-public playlist-modify-private playlist-read-private playlist-read-collaborative user-read-private",
             cache_path=str(self.cache_path),
+            open_browser=False,
         )
 
         if self.refresh_token:
@@ -68,7 +69,11 @@ class SpotifyClient:
             try:
                 auth_manager.refresh_access_token(self.refresh_token)
             except Exception as e:
-                print(f"Warning: Token refresh failed: {e}", flush=True)
+                raise RuntimeError(
+                    f"Token refresh failed: {e}. "
+                    "The refresh token is invalid or expired — run bin/setup_auth.py "
+                    "locally and update the SPOTIFY_REFRESH_TOKEN secret."
+                ) from e
 
         self.client = spotipy.Spotify(auth_manager=auth_manager)
 

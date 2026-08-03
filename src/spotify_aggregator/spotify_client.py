@@ -84,7 +84,12 @@ class SpotifyClient:
                         f.write(rotated)
                     print("Spotify rotated the refresh token; saved for persistence.", flush=True)
 
-        self.client = spotipy.Spotify(auth_manager=auth_manager)
+        self.client = spotipy.Spotify(
+            auth_manager=auth_manager,
+            requests_timeout=30,
+            retries=3,
+            backoff_factor=1.0,
+        )
 
     def _retry_with_backoff(self, func, max_retries: int = 3, base_delay: float = 1.0):
         for attempt in range(max_retries):
@@ -151,7 +156,9 @@ class SpotifyClient:
         return matches
 
     def get_playlist(self, playlist_id: str) -> Dict[str, Any]:
-        return self._retry_with_backoff(lambda: self.client.playlist(playlist_id))
+        return self._retry_with_backoff(
+            lambda: self.client.playlist(playlist_id, fields="id,name,tracks.total")
+        )
 
     def get_playlist_tracks(self, playlist_id: str) -> List[Dict[str, Any]]:
         tracks = []

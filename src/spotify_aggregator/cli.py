@@ -1,7 +1,8 @@
 import argparse
 import fnmatch
+import re
 import sys
-from typing import List, Dict, Set, Any
+from typing import List, Dict, Optional, Set, Any
 
 from spotify_aggregator.config import Config, ConfigError
 from spotify_aggregator.spotify_client import SpotifyClient
@@ -12,6 +13,16 @@ def _print(msg: str, **kwargs):
     sys.stdout.flush()
 
 
+_PLAYLIST_ID_RE = re.compile(
+    r'^(?:spotify:playlist:|https://open\.spotify\.com/playlist/)?([0-9A-Za-z]{22})(?:\?.*)?$'
+)
+
+
+def _playlist_id(ref: str) -> Optional[str]:
+    match = _PLAYLIST_ID_RE.match(ref)
+    return match.group(1) if match else None
+
+
 class PlaylistAggregator:
     def __init__(self, client: SpotifyClient, config: Config, dry_run: bool = False):
         self.client = client
@@ -19,14 +30,26 @@ class PlaylistAggregator:
         self.dry_run = dry_run
 
     def resolve_playlist_names(self, patterns: List[str]) -> List[Dict[str, Any]]:
-        all_playlists = self.client.get_user_playlists()
-        _print(f"Fetched {len(all_playlists)} playlists")
         resolved = []
         seen_ids = set()
+        all_playlists = None
+
+        def listing():
+            nonlocal all_playlists
+            if all_playlists is None:
+                all_playlists = self.client.get_user_playlists()
+                _print(f"Fetched {len(all_playlists)} playlists")
+            return all_playlists
 
         for pattern in patterns:
-            if '*' in pattern or '?' in pattern or '[' in pattern:
-                matches = [p for p in all_playlists if fnmatch.fnmatch(p['name'], pattern)]
+            pid = _playlist_id(pattern)
+            if pid:
+                playlist = self.client.get_playlist(pid)
+                if playlist['id'] not in seen_ids:
+                    resolved.append(playlist)
+                    seen_ids.add(playlist['id'])
+            elif '*' in pattern or '?' in pattern or '[' in pattern:
+                matches = [p for p in listing() if fnmatch.fnmatch(p['name'], pattern)]
                 if not matches:
                     raise ValueError(f"No playlists found matching pattern: {pattern}")
                 matches.sort(key=lambda p: p['name'])
@@ -35,7 +58,7 @@ class PlaylistAggregator:
                         resolved.append(match)
                         seen_ids.add(match['id'])
             else:
-                playlist = next((p for p in all_playlists if p['name'] == pattern), None)
+                playlist = next((p for p in listing() if p['name'] == pattern), None)
                 if not playlist:
                     raise ValueError(f"Playlist not found: {pattern}")
                 if playlist['id'] not in seen_ids:
@@ -92,7 +115,11 @@ class PlaylistAggregator:
                 return
 
             _print(f"\nResolving target playlist: {self.config.target_playlist}")
-            target_playlist = self.client.find_playlist_by_name(self.config.target_playlist)
+            target_id = _playlist_id(self.config.target_playlist)
+            if target_id:
+                target_playlist = self.client.get_playlist(target_id)
+            else:
+                target_playlist = self.client.find_playlist_by_name(self.config.target_playlist)
 
             if not target_playlist:
                 if self.dry_run:

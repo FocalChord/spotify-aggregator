@@ -150,6 +150,9 @@ class SpotifyClient:
                 matches.append(playlist)
         return matches
 
+    def get_playlist(self, playlist_id: str) -> Dict[str, Any]:
+        return self._retry_with_backoff(lambda: self.client.playlist(playlist_id))
+
     def get_playlist_tracks(self, playlist_id: str) -> List[Dict[str, Any]]:
         tracks = []
         results = self._retry_with_backoff(

@@ -1,10 +1,14 @@
-target_playlist: "All Years"
+# Entries may be Spotify playlist IDs (most reliable), exact names, or glob
+# patterns. IDs are required for CI: Spotify returns an empty playlist
+# *listing* to datacenter IPs (like GitHub Actions runners), so name lookups
+# flake there — but direct fetch by ID always works.
+target_playlist: "0OGOhsdqasxSwiV10IvOMK"  # All Years
 source_playlists:
-  - "2019"
-  - "2020"
-  - "2021"
-  - "2022"
-  - "2023"
-  - "2024"
-  - "2025"
-  - "2026"
+  - "5yPHlfNYN1vzgP86aabQNj"  # 2019
+  - "3bhShXsc7UG7evmbGOhJBL"  # 2020
+  - "0aMrWESr0Ei9sqe1vthcqb"  # 2021 (the 100-track one; a second "2021" playlist exists)
+  - "2xDJBouQuE4o2ZyCyYDPH2"  # 2022
+  - "4DDP9at9T3BAToRC536suh"  # 2023
+  - "12LYpkU9LSJulI3jviOOWo"  # 2024
+  - "2e76aJ4aOKoS3wZGIo3cx1"  # 2025
+  - "32AE7trPfdWqckKM9uTeD5"  # 2026

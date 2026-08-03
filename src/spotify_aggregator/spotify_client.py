@@ -109,12 +109,14 @@ class SpotifyClient:
 
     def get_user_playlists(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         playlists = []
-        if not user_id:
-            user_id = self.get_current_user()['id']
-        
-        results = self._retry_with_backoff(
-            lambda: self.client.user_playlists(user_id)
-        )
+        if user_id:
+            results = self._retry_with_backoff(
+                lambda: self.client.user_playlists(user_id)
+            )
+        else:
+            results = self._retry_with_backoff(
+                lambda: self.client.current_user_playlists()
+            )
 
         playlists.extend(results['items'])
 

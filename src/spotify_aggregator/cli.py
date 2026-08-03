@@ -1,4 +1,5 @@
 import argparse
+import fnmatch
 import sys
 from typing import List, Dict, Set, Any
 
@@ -6,8 +7,8 @@ from spotify_aggregator.config import Config, ConfigError
 from spotify_aggregator.spotify_client import SpotifyClient
 
 
-def _print(msg: str):
-    print(msg)
+def _print(msg: str, **kwargs):
+    print(msg, **kwargs)
     sys.stdout.flush()
 
 
@@ -24,7 +25,7 @@ class PlaylistAggregator:
 
         for pattern in patterns:
             if '*' in pattern or '?' in pattern or '[' in pattern:
-                matches = self.client.find_playlists_by_pattern(pattern)
+                matches = [p for p in all_playlists if fnmatch.fnmatch(p['name'], pattern)]
                 if not matches:
                     raise ValueError(f"No playlists found matching pattern: {pattern}")
                 matches.sort(key=lambda p: p['name'])
@@ -33,7 +34,7 @@ class PlaylistAggregator:
                         resolved.append(match)
                         seen_ids.add(match['id'])
             else:
-                playlist = self.client.find_playlist_by_name(pattern)
+                playlist = next((p for p in all_playlists if p['name'] == pattern), None)
                 if not playlist:
                     raise ValueError(f"Playlist not found: {pattern}")
                 if playlist['id'] not in seen_ids:

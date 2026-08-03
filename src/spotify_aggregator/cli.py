@@ -20,7 +20,7 @@ class PlaylistAggregator:
 
     def resolve_playlist_names(self, patterns: List[str]) -> List[Dict[str, Any]]:
         all_playlists = self.client.get_user_playlists()
-        _print(f"Fetched {len(all_playlists)} playlists: {sorted(p['name'] for p in all_playlists)[:30]}")
+        _print(f"Fetched {len(all_playlists)} playlists")
         resolved = []
         seen_ids = set()
 

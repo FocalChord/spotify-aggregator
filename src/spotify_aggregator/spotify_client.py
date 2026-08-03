@@ -67,13 +67,22 @@ class SpotifyClient:
                 json.dump(cache_data, f)
 
             try:
-                auth_manager.refresh_access_token(self.refresh_token)
+                token_info = auth_manager.refresh_access_token(self.refresh_token)
             except Exception as e:
                 raise RuntimeError(
                     f"Token refresh failed: {e}. "
                     "The refresh token is invalid or expired — run bin/setup_auth.py "
                     "locally and update the SPOTIFY_REFRESH_TOKEN secret."
                 ) from e
+
+            rotated = (token_info or {}).get('refresh_token')
+            if rotated and rotated != self.refresh_token:
+                self.refresh_token = rotated
+                rotated_file = os.getenv("ROTATED_TOKEN_FILE")
+                if rotated_file:
+                    with open(rotated_file, 'w') as f:
+                        f.write(rotated)
+                    print("Spotify rotated the refresh token; saved for persistence.", flush=True)
 
         self.client = spotipy.Spotify(auth_manager=auth_manager)
 

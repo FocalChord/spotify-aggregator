@@ -7,6 +7,7 @@ on:
 
 permissions:
   actions: write
+  contents: write
 
 jobs:
   aggregate:
@@ -32,13 +33,47 @@ jobs:
       - name: Setup config file
         run: cp config.example.yaml config.yaml
 
+      - name: Load refresh token (rotated copy takes precedence over secret)
+        env:
+          TOKEN_ENC_KEY: ${{ secrets.TOKEN_ENC_KEY }}
+          SECRET_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+        run: |
+          if [ -f .spotify_refresh_token.enc ]; then
+            TOKEN=$(openssl enc -d -aes-256-cbc -pbkdf2 -in .spotify_refresh_token.enc -pass env:TOKEN_ENC_KEY)
+            echo "Using persisted rotated refresh token."
+          else
+            TOKEN="$SECRET_REFRESH_TOKEN"
+            echo "Using refresh token from repository secret."
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "SPOTIFY_REFRESH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
       - name: Run aggregation
         env:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
-          SPOTIFY_REFRESH_TOKEN: ${{ secrets.SPOTIFY_REFRESH_TOKEN }}
+          ROTATED_TOKEN_FILE: ${{ runner.temp }}/rotated_refresh_token
         run: |
           uv run python -u -m spotify_aggregator.cli --config config.yaml
+
+      - name: Persist rotated refresh token
+        if: always()
+        env:
+          TOKEN_ENC_KEY: ${{ secrets.TOKEN_ENC_KEY }}
+        run: |
+          if [ -f "$RUNNER_TEMP/rotated_refresh_token" ]; then
+            openssl enc -aes-256-cbc -pbkdf2 -salt \
+              -in "$RUNNER_TEMP/rotated_refresh_token" \
+              -out .spotify_refresh_token.enc -pass env:TOKEN_ENC_KEY
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .spotify_refresh_token.enc
+            git commit -m "Persist rotated Spotify refresh token"
+            git push
+            echo "Rotated refresh token persisted."
+          else
+            echo "No token rotation this run."
+          fi
 
       - name: Keepalive (prevent 60-day inactivity auto-disable)
         env:
